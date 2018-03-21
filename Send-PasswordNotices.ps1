@@ -14,7 +14,7 @@
 Function Start-Logging {
     <#
     .SYNOPSIS
-    This function starts a transcript in the specified directory and cleans up any files older than the specified number of days. 
+    This function starts a transcript in the specified directory and cleans up any files older than the specified number of days.
 
     .DESCRIPTION
     Please ensure that the log directory specified is empty, as this function will clean that folder.
@@ -53,7 +53,7 @@ Function Start-Logging {
    $pswindow.WindowSize = $newsize
    $ErrorActionPreference = 'Continue'
 
-   #Remove the trailing slash if present. 
+   #Remove the trailing slash if present.
    If ($LogDirectory -like "*\") {
        $LogDirectory = $LogDirectory.SubString(0,($LogDirectory.Length-1))
    }
@@ -72,7 +72,7 @@ Function Start-Logging {
    #Purges log files older than X days
    $RetentionDate = (Get-Date).AddDays(-$LogRetentionDays)
    Get-ChildItem -Path $LogDirectory -Recurse -Force | Where-Object { !$_.PSIsContainer -and $_.CreationTime -lt $RetentionDate -and $_.Name -like "*.log"} | Remove-Item -Force
-} 
+}
 
 Function Send-Notice
 {
@@ -83,7 +83,7 @@ Function Send-Notice
     .DESCRIPTION
     Send-notice - sends emails to users based on days before password expiration.  Requires user email address, days before password expiration, password expiration date, and user account name variables.
     Notices are only sent if days before password is due to expire are equal to 1,2,3,7, or 14.
-    
+
     .LINK
     https://github.com/AndrewEllis93/PowerShell-Scripts
 
@@ -137,27 +137,28 @@ Function Send-AllNotices {
     <#
     .SYNOPSIS
     Main process.  Collects user accounts, calculates password expiration dates and passes the value along with user information to the send-notice function.
-    
+
     .DESCRIPTION
-    
+
     .EXAMPLE
     Send-AllNotices -ADGroupExclusion "Test Group" -MailFrom "noreply@email.com" -smtpserver "server.domain.local"
-    
+
     .LINK
     https://github.com/AndrewEllis93/PowerShell-Scripts
 
     .NOTES
     Author: Andrew Ellis
     #>
-    
+
     Param (
         [string]$ADGroupExclusion,
+        [string]$AD_Target_OU,
         [Parameter(Mandatory=$true)][string]$MailFrom,
         [Parameter(Mandatory=$true)][string]$smtpserver
     )
 
     $ServiceAccounts = Get-ADGroupMember -Identity $ADGroupExclusion -ErrorAction Stop
-    $Users = Get-ADUser -Filter {(enabled -eq $true -and passwordneverexpires -eq $false)} -properties samaccountname, name, mail, msDS-UserPasswordExpiryTimeComputed -ErrorAction Stop | 
+    $Users = Get-ADUser -SearchBase $AD_OU -Filter {(enabled -eq $true -and passwordneverexpires -eq $false)} -properties samaccountname, name, mail, msDS-UserPasswordExpiryTimeComputed -ErrorAction Stop |
         Select-Object samaccountname, name, mail, msDS-UserPasswordExpiryTimeComputed
 
     #Filter users
@@ -179,7 +180,7 @@ Function Send-AllNotices {
     $Users | foreach-object {
         $Expirationdate = [datetime]::FromFileTime($_.'msDS-UserPasswordExpiryTimeComputed')
         $Expirationdays = ($Expirationdate - (Get-Date)).Days
-        
+
         Send-Notice -usermail $_.Mail -days $ExpirationDays -expirationdate $expirationdate -SAM $_.SamAccountName -SMTPServer $smtpserver -MailFrom $mailfrom
     }
 }
@@ -188,7 +189,7 @@ Function Send-AllNotices {
 Start-Logging -logdirectory "C:\ScriptLogs\SendPasswordNotices" -logname "SendPasswordNotices" -LogRetentionDays 30
 
 #Start function
-Send-AllNotices -ADGroupExclusion "Test Group" -MailFrom "noreply@email.com" -smtpserver "server.domain.local"
+Send-AllNotices -AD_Target_OU "OU=my_domain_users,DC=my_domain,DC=local" -ADGroupExclusion "Test Group" -MailFrom "noreply@email.com" -smtpserver "server.domain.local"
 
 #Stop logging.
 Stop-Transcript
